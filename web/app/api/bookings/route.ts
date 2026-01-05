@@ -104,9 +104,9 @@ export async function POST(req: Request) {
         }
       })
 
-      const planId = (hostUser?.organizationId && hostUser.organization?.subscriptionPlan) 
-        ? hostUser.organization.subscriptionPlan 
-        : (hostUser?.subscriptionPlan || "free")
+      const planId: "free" | "pro" | "team" = (hostUser?.organizationId && hostUser.organization?.subscriptionPlan) 
+        ? (hostUser.organization.subscriptionPlan as "free" | "pro" | "team")
+        : ((hostUser?.subscriptionPlan as "free" | "pro" | "team") || "free")
 
       // Check Google Calendar busy slots if user has calendar integration
       if (checkFeatureAccess(planId, "calendarIntegrations")) {
@@ -265,9 +265,9 @@ export async function POST(req: Request) {
         }
       })
 
-      const planId = (hostUser?.organizationId && hostUser.organization?.subscriptionPlan) 
-        ? hostUser.organization.subscriptionPlan 
-        : (hostUser?.subscriptionPlan || "free")
+      const planId: "free" | "pro" | "team" = (hostUser?.organizationId && hostUser.organization?.subscriptionPlan) 
+        ? (hostUser.organization.subscriptionPlan as "free" | "pro" | "team")
+        : ((hostUser?.subscriptionPlan as "free" | "pro" | "team") || "free")
 
       // Check Google Calendar busy slots if user has calendar integration (skip for blocked time)
       if (status !== "blocked" && attendeeEmail !== "blocked@internal.com" && checkFeatureAccess(planId, "calendarIntegrations")) {
