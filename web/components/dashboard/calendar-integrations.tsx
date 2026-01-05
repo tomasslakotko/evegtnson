@@ -33,14 +33,29 @@ export function CalendarIntegrations() {
       const res = await fetch("/api/calendar/google")
       if (res.ok) {
         const data = await res.json()
+        // Check if Google account has calendar access by trying to get calendar client
+        let hasCalendarAccess = false
+        if (data.connected) {
+          try {
+            const calendarRes = await fetch("/api/calendar/google/check-access")
+            if (calendarRes.ok) {
+              const calendarData = await calendarRes.json()
+              hasCalendarAccess = calendarData.hasAccess || false
+            }
+          } catch (e) {
+            // If check fails, assume no calendar access
+            hasCalendarAccess = false
+          }
+        }
+        
         setIntegrations([
           {
             id: "google",
             name: "Google Calendar",
             icon: <div className="bg-red-100 p-2 rounded-full w-10 h-10 flex items-center justify-center font-bold text-red-600">G</div>,
             description: "Connect your Google Calendar to check for conflicts and sync events",
-            connected: data.connected || false,
-            action: data.connected ? handleDisconnect : handleConnect,
+            connected: hasCalendarAccess,
+            action: hasCalendarAccess ? handleDisconnect : handleConnect,
           },
           {
             id: "outlook",
@@ -137,6 +152,11 @@ export function CalendarIntegrations() {
                 <p className="text-sm text-muted-foreground mt-1">
                   {integration.description}
                 </p>
+                {integration.id === "google" && (
+                  <p className="text-xs text-muted-foreground mt-1 italic">
+                    Requires separate Google Calendar access (different from Google account connection)
+                  </p>
+                )}
               </div>
             </div>
             <Button

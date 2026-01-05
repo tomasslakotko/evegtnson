@@ -96,7 +96,8 @@ export function ProfileSettings() {
 
   const handleLinkGoogle = async () => {
     try {
-        await signIn("google", { callbackUrl: "/dashboard/settings" })
+        // Redirect to our custom endpoint that connects Google account without calendar
+        window.location.href = "/api/auth/google-account"
     } catch (error) {
         console.error("Link Google error:", error)
         setError("Failed to link Google account")
@@ -240,11 +241,11 @@ export function ProfileSettings() {
                             </svg>
                         </div>
                         <div>
-                            <p className="text-sm font-medium">Google</p>
+                            <p className="text-sm font-medium">Google Account</p>
                             <p className="text-xs text-muted-foreground">
                                 {profile?.providers?.includes("google") 
-                                    ? "Connected" 
-                                    : "Not connected"}
+                                    ? "Account connected (no calendar access)" 
+                                    : "Connect your Google account for sign-in"}
                             </p>
                         </div>
                     </div>
@@ -255,11 +256,14 @@ export function ProfileSettings() {
                         </Button>
                     ) : (
                         <Button type="button" variant="outline" size="sm" onClick={handleLinkGoogle}>
-                            Connect
+                            Connect Account
                         </Button>
                     )}
                 </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Note: This connects your Google account for authentication only. To sync with Google Calendar, use the Calendar Integrations section below.
+            </p>
           </div>
 
           {/* Username */}
