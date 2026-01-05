@@ -86,6 +86,52 @@ export async function sendBookingEmail(options: {
 
 // ... existing sendBookingConfirmationEmail, sendBookingUpdateEmail, sendMeetingLinkEmail ...
 
+// Wrapper function to handle all email types
+export async function sendBookingEmail(options: {
+  type: "confirmation" | "reminder" | "rescheduled" | "updated" | "cancelled" | "meeting_link",
+  booking: any,
+  eventType: any,
+  host: any
+}) {
+  if (!process.env.RESEND_API_KEY) {
+      console.warn("RESEND_API_KEY not set, skipping email")
+      return
+  }
+
+  const { type, booking, eventType, host } = options
+  
+  // Construct simplified data object
+  const data: BookingEmailData = {
+      attendeeName: booking.attendeeName,
+      attendeeEmail: booking.attendeeEmail,
+      eventTitle: eventType.title,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      hostName: host.name || host.email || "Host",
+      meetingUrl: booking.meetingUrl,
+      locationType: eventType.locationType,
+      notes: booking.attendeeNotes,
+      // Calculate iCal URL
+      icalUrl: booking.id ? `${process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"}/api/bookings/${booking.id}/ical` : undefined
+  }
+
+  if (type === "confirmation") {
+      return sendBookingConfirmationEmail(data);
+  }
+  
+  if (type === "rescheduled" || type === "updated" || type === "cancelled") {
+      return sendBookingUpdateEmail(data, type);
+  }
+
+  if (type === "meeting_link") {
+      return sendMeetingLinkEmail(data);
+  }
+
+  if (type === "reminder") {
+      return sendBookingReminderEmail(data);
+  }
+}
+
 export async function sendBookingConfirmationEmail(data: BookingEmailData) {
   if (!process.env.RESEND_API_KEY) {
     console.warn("RESEND_API_KEY not set, skipping email")
