@@ -8,6 +8,7 @@ import { checkFeatureAccess } from "@/lib/subscription"
 
 const updateBookingSchema = z.object({
   startTime: z.string().datetime().optional(),
+  endTime: z.string().datetime().optional(),
   attendeeName: z.string().optional(),
   attendeeEmail: z.string().email().optional(),
   attendeePhone: z.string().optional(),
