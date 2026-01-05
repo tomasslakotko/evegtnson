@@ -50,9 +50,9 @@ export default async function DashboardPage() {
   const identifier = user?.organization?.slug || user?.username || "user"
 
   // Check subscription plan limits
-  const planId = (user?.organizationId && user.organization?.subscriptionPlan) 
-    ? user.organization.subscriptionPlan 
-    : (user?.subscriptionPlan || "free")
+  const planId: "free" | "pro" | "team" = (user?.organizationId && user.organization?.subscriptionPlan) 
+    ? (user.organization.subscriptionPlan as "free" | "pro" | "team")
+    : ((user?.subscriptionPlan as "free" | "pro" | "team") || "free")
   
   const currentPlan = getPlanById(planId)
   const canCreateMore = checkLimit(planId, "eventTypes", filteredEventTypes.length)
