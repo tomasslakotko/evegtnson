@@ -16,13 +16,7 @@ interface BookingEmailData {
   bookingId?: string
 }
 
-export async function sendBookingConfirmationEmail(data: BookingEmailData) {
-  if (!process.env.RESEND_API_KEY) {
-    console.warn("RESEND_API_KEY not set, skipping email")
-    return
-  }
-
-  const formatDate = (date: Date) => {
+const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat("ru-RU", {
       weekday: "long",
       year: "numeric",
@@ -32,13 +26,70 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData) {
       minute: "2-digit",
       timeZone: "Europe/Moscow",
     }).format(date)
-  }
+}
 
-  const formatTime = (date: Date) => {
+const formatTime = (date: Date) => {
     return new Intl.DateTimeFormat("ru-RU", {
       hour: "2-digit",
       minute: "2-digit",
     }).format(date)
+}
+
+// ... existing functions ...
+
+export async function sendBookingEmail(options: {
+    type: "confirmation" | "reminder" | "rescheduled" | "updated" | "cancelled" | "meeting_link",
+    booking: any,
+    eventType: any,
+    host: any
+}) {
+    if (!process.env.RESEND_API_KEY) {
+        console.warn("RESEND_API_KEY not set, skipping email")
+        return
+    }
+
+    const { type, booking, eventType, host } = options
+    
+    // Construct simplified data object
+    const data: BookingEmailData = {
+        attendeeName: booking.attendeeName,
+        attendeeEmail: booking.attendeeEmail,
+        eventTitle: eventType.title,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        hostName: host.name || "Host",
+        meetingUrl: booking.meetingUrl,
+        locationType: eventType.locationType,
+        notes: booking.attendeeNotes,
+        // Calculate iCal URL if needed, but for cron we might not have it easily constructed without base URL
+        // We can pass it or construct it
+        icalUrl: booking.id ? `${process.env.NEXTAUTH_URL}/api/bookings/${booking.id}/ical` : undefined
+    }
+
+    // Reuse existing logic or implement new
+    if (type === "confirmation") {
+        return sendBookingConfirmationEmail(data);
+    }
+    
+    if (type === "rescheduled" || type === "updated" || type === "cancelled") {
+        return sendBookingUpdateEmail(data, type);
+    }
+
+    if (type === "meeting_link") {
+        return sendMeetingLinkEmail(data);
+    }
+
+    if (type === "reminder") {
+        return sendBookingReminderEmail(data);
+    }
+}
+
+// ... existing sendBookingConfirmationEmail, sendBookingUpdateEmail, sendMeetingLinkEmail ...
+
+export async function sendBookingConfirmationEmail(data: BookingEmailData) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("RESEND_API_KEY not set, skipping email")
+    return
   }
 
   const locationText = data.locationType === "mirotalk" 
@@ -106,7 +157,6 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData) {
     })
   } catch (error) {
     console.error("Error sending confirmation email:", error)
-    // Don't throw - email failure shouldn't break booking creation
   }
 }
 
@@ -114,25 +164,6 @@ export async function sendBookingUpdateEmail(data: BookingEmailData, updateType:
   if (!process.env.RESEND_API_KEY) {
     console.warn("RESEND_API_KEY not set, skipping email")
     return
-  }
-
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat("ru-RU", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "Europe/Moscow",
-    }).format(date)
-  }
-
-  const formatTime = (date: Date) => {
-    return new Intl.DateTimeFormat("ru-RU", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date)
   }
 
   const locationText = data.locationType === "mirotalk" 
@@ -228,7 +259,6 @@ export async function sendBookingUpdateEmail(data: BookingEmailData, updateType:
     })
   } catch (error) {
     console.error(`Error sending ${updateType} email:`, error)
-    // Don't throw - email failure shouldn't break booking updates
   }
 }
 
@@ -236,25 +266,6 @@ export async function sendMeetingLinkEmail(data: BookingEmailData & { icalUrl?: 
   if (!process.env.RESEND_API_KEY || !data.meetingUrl) {
     console.warn("RESEND_API_KEY not set or no meeting URL, skipping email")
     return
-  }
-
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat("ru-RU", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "Europe/Moscow",
-    }).format(date)
-  }
-
-  const formatTime = (date: Date) => {
-    return new Intl.DateTimeFormat("ru-RU", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date)
   }
 
   try {
@@ -316,7 +327,72 @@ export async function sendMeetingLinkEmail(data: BookingEmailData & { icalUrl?: 
     })
   } catch (error) {
     console.error("Error sending meeting link email:", error)
-    // Don't throw - email failure shouldn't break booking updates
   }
 }
 
+export async function sendBookingReminderEmail(data: BookingEmailData) {
+    if (!process.env.RESEND_API_KEY) {
+      console.warn("RESEND_API_KEY not set, skipping email")
+      return
+    }
+  
+    const locationText = data.locationType === "mirotalk" 
+      ? "MiroTalk Video" 
+      : data.locationType?.replace("_", " ") || "Online"
+  
+    try {
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev"
+      
+      await resend.emails.send({
+        from: fromEmail,
+        to: data.attendeeEmail,
+        subject: `Напоминание: ${data.eventTitle} завтра`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+              <h1 style="color: white; margin: 0;">Напоминание о встрече</h1>
+            </div>
+            
+            <div style="background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb;">
+              <p style="font-size: 16px; margin-bottom: 20px;">Здравствуйте, <strong>${data.attendeeName}</strong>!</p>
+              
+              <p style="font-size: 16px; margin-bottom: 20px;">Напоминаем, что у вас запланирована встреча "<strong>${data.eventTitle}</strong>" завтра.</p>
+              
+              <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #8b5cf6;">
+                <h2 style="margin-top: 0; color: #8b5cf6;">Детали встречи</h2>
+                <p style="margin: 10px 0;"><strong>📅 Дата и время:</strong> ${formatDate(data.startTime)}</p>
+                <p style="margin: 10px 0;"><strong>⏰ Время:</strong> ${formatTime(data.startTime)} - ${formatTime(data.endTime)}</p>
+                <p style="margin: 10px 0;"><strong>👤 Хост:</strong> ${data.hostName}</p>
+                <p style="margin: 10px 0;"><strong>📍 Место:</strong> ${locationText}</p>
+              </div>
+              
+              ${data.meetingUrl ? `
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${data.meetingUrl}" style="background: #8b5cf6; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+                    🔗 Присоединиться к встрече
+                  </a>
+                </div>
+              ` : ""}
+              
+              <p style="font-size: 14px; color: #6b7280; margin-top: 30px;">
+                Мы с нетерпением ждем встречи с вами!
+              </p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px; color: #9ca3af; font-size: 12px;">
+              <p>Это автоматическое письмо, пожалуйста, не отвечайте на него.</p>
+            </div>
+          </body>
+          </html>
+        `,
+      })
+    } catch (error) {
+      console.error("Error sending reminder email:", error)
+    }
+  }

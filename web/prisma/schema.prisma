@@ -157,6 +157,8 @@ model Booking {
   meetingUrl    String?
   googleCalendarEventId String? // ID события в Google Calendar
   
+  reminderSent  Boolean  @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
