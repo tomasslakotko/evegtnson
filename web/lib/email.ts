@@ -35,56 +35,6 @@ const formatTime = (date: Date) => {
     }).format(date)
 }
 
-// ... existing functions ...
-
-export async function sendBookingEmail(options: {
-    type: "confirmation" | "reminder" | "rescheduled" | "updated" | "cancelled" | "meeting_link",
-    booking: any,
-    eventType: any,
-    host: any
-}) {
-    if (!process.env.RESEND_API_KEY) {
-        console.warn("RESEND_API_KEY not set, skipping email")
-        return
-    }
-
-    const { type, booking, eventType, host } = options
-    
-    // Construct simplified data object
-    const data: BookingEmailData = {
-        attendeeName: booking.attendeeName,
-        attendeeEmail: booking.attendeeEmail,
-        eventTitle: eventType.title,
-        startTime: booking.startTime,
-        endTime: booking.endTime,
-        hostName: host.name || "Host",
-        meetingUrl: booking.meetingUrl,
-        locationType: eventType.locationType,
-        notes: booking.attendeeNotes,
-        // Calculate iCal URL if needed, but for cron we might not have it easily constructed without base URL
-        // We can pass it or construct it
-        icalUrl: booking.id ? `${process.env.NEXTAUTH_URL}/api/bookings/${booking.id}/ical` : undefined
-    }
-
-    // Reuse existing logic or implement new
-    if (type === "confirmation") {
-        return sendBookingConfirmationEmail(data);
-    }
-    
-    if (type === "rescheduled" || type === "updated" || type === "cancelled") {
-        return sendBookingUpdateEmail(data, type);
-    }
-
-    if (type === "meeting_link") {
-        return sendMeetingLinkEmail(data);
-    }
-
-    if (type === "reminder") {
-        return sendBookingReminderEmail(data);
-    }
-}
-
-// ... existing sendBookingConfirmationEmail, sendBookingUpdateEmail, sendMeetingLinkEmail ...
 
 // Wrapper function to handle all email types
 export async function sendBookingEmail(options: {
