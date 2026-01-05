@@ -303,7 +303,7 @@ export default function CalendarPage() {
                  <User className="h-4 w-4" />
                  Team Members
                </div>
-               <Button variant="ghost" size="xs" onClick={toggleAllHosts} className="h-6 text-xs text-muted-foreground">
+                <Button variant="ghost" size="sm" onClick={toggleAllHosts} className="h-6 text-xs text-muted-foreground">
                  {selectedHosts.length === members.length ? "Hide All" : "Select All"}
                </Button>
              </div>
