@@ -20,10 +20,7 @@ export default async function BookingsPage() {
 
     const bookings = await prisma.booking.findMany({
       where: { 
-        hostId: session.user.id,
-        eventType: {
-          isNot: null
-        }
+        hostId: session.user.id
       },
       orderBy: { startTime: 'desc' },
       select: {
