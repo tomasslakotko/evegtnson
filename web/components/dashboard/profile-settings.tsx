@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Loader2, Check, X, Mail, Upload } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-
 import { signIn } from "next-auth/react"
 
 interface ProfileData {
@@ -20,72 +19,48 @@ interface ProfileData {
   username: string | null
   bio: string | null
   image: string | null
-  providers?: string[] // Added providers
+  providers?: string[]
 }
 
 export function ProfileSettings() {
   const router = useRouter()
-  // ... existing state ...
+  const inputFileRef = useRef<HTMLInputElement>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // ... existing useEffect ...
+  const [formData, setFormData] = useState({
+    name: "",
+    username: "",
+    bio: "",
+  })
 
-  const handleLinkGoogle = async () => {
-    try {
-        await signIn("google", { callbackUrl: "/dashboard/settings" })
-    } catch (error) {
-        console.error("Link Google error:", error)
-        setError("Failed to link Google account")
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch("/api/profile")
+        if (res.ok) {
+          const data = await res.json()
+          setProfile(data)
+          setFormData({
+            name: data.name || "",
+            username: data.username || "",
+            bio: data.bio || "",
+          })
+        }
+      } catch (err) {
+        console.error("Error fetching profile:", err)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }
+    fetchProfile()
+  }, [])
 
-  // ... existing handleUpload and handleSubmit ...
-
-  return (
-    <Card>
-      {/* ... existing header and content start ... */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          
-          {/* ... Avatar Section ... */}
-
-          {/* ... Email Section ... */}
-          
-          {/* Linked Accounts Section - New */}
-          <div className="grid gap-2">
-            <Label>Linked Accounts</Label>
-            <div className="border rounded-md p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-white p-2 rounded-full border shadow-sm">
-                            <svg className="h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
-                                <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium">Google</p>
-                            <p className="text-xs text-muted-foreground">
-                                {profile?.providers?.includes("google") 
-                                    ? "Connected" 
-                                    : "Not connected"}
-                            </p>
-                        </div>
-                    </div>
-                    {profile?.providers?.includes("google") ? (
-                        <Button variant="outline" size="sm" disabled className="text-green-600 border-green-200 bg-green-50">
-                            <Check className="mr-2 h-3 w-3" />
-                            Connected
-                        </Button>
-                    ) : (
-                        <Button type="button" variant="outline" size="sm" onClick={handleLinkGoogle}>
-                            Connect
-                        </Button>
-                    )}
-                </div>
-            </div>
-          </div>
-
-          {/* ... Username Section ... */}
-          
-          {/* ... Rest of form ... */}
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) {
       return;
     }
@@ -118,6 +93,15 @@ export function ProfileSettings() {
       setIsUploading(false);
     }
   };
+
+  const handleLinkGoogle = async () => {
+    try {
+        await signIn("google", { callbackUrl: "/dashboard/settings" })
+    } catch (error) {
+        console.error("Link Google error:", error)
+        setError("Failed to link Google account")
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -212,7 +196,6 @@ export function ProfileSettings() {
                         size="sm"
                         className="text-destructive hover:text-destructive"
                         onClick={async () => {
-                             // Simple remove from UI and DB update
                              setProfile(prev => prev ? ({ ...prev, image: null }) : null);
                              await fetch("/api/profile", {
                                 method: "PATCH",
@@ -243,6 +226,40 @@ export function ProfileSettings() {
               <Mail className="h-4 w-4 text-muted-foreground" />
             </div>
             <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+          </div>
+
+          {/* Linked Accounts Section */}
+          <div className="grid gap-2">
+            <Label>Linked Accounts</Label>
+            <div className="border rounded-md p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white p-2 rounded-full border shadow-sm">
+                            <svg className="h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
+                                <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium">Google</p>
+                            <p className="text-xs text-muted-foreground">
+                                {profile?.providers?.includes("google") 
+                                    ? "Connected" 
+                                    : "Not connected"}
+                            </p>
+                        </div>
+                    </div>
+                    {profile?.providers?.includes("google") ? (
+                        <Button variant="outline" size="sm" disabled className="text-green-600 border-green-200 bg-green-50">
+                            <Check className="mr-2 h-3 w-3" />
+                            Connected
+                        </Button>
+                    ) : (
+                        <Button type="button" variant="outline" size="sm" onClick={handleLinkGoogle}>
+                            Connect
+                        </Button>
+                    )}
+                </div>
+            </div>
           </div>
 
           {/* Username */}
