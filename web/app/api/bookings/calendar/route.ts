@@ -68,7 +68,12 @@ export async function GET(req: Request) {
       },
     })
 
-    return NextResponse.json(bookings)
+    // Cache headers for better performance
+    return NextResponse.json(bookings, {
+      headers: {
+        'Cache-Control': 'private, max-age=60, stale-while-revalidate=120',
+      },
+    })
   } catch (error) {
     console.error("Error fetching calendar bookings:", error)
     return new NextResponse("Error fetching calendar bookings", { status: 500 })
