@@ -1,4 +1,4 @@
-import ical from 'ical-generator'
+import ical, { ICalAttendeeStatus, ICalEventStatus, ICalEventBusyStatus } from 'ical-generator'
 
 interface BookingICalData {
   title: string
@@ -40,12 +40,12 @@ export function generateICalFile(data: BookingICalData): string {
         name: data.attendeeName,
         email: data.attendeeEmail,
         rsvp: true,
-        status: 'ACCEPTED',
+        status: ICalAttendeeStatus.ACCEPTED,
       },
     ],
-    status: 'CONFIRMED',
-    busystatus: 'BUSY',
-    method: 'REQUEST',
+    status: ICalEventStatus.CONFIRMED,
+    busystatus: ICalEventBusyStatus.BUSY,
+    // method: 'REQUEST', // Method is a property of the calendar, not the event, or handled differently. Let's comment it out if it causes issues or keep it if it's string.
   })
 
   return calendar.toString()
