@@ -110,9 +110,9 @@ export async function POST(req: Request) {
     })
 
     // Check subscription plan limits
-    const planId = (user?.organizationId && user.organization?.subscriptionPlan) 
-      ? user.organization.subscriptionPlan 
-      : (user?.subscriptionPlan || "free")
+    const planId: "free" | "pro" | "team" = (user?.organizationId && user.organization?.subscriptionPlan) 
+      ? (user.organization.subscriptionPlan as "free" | "pro" | "team")
+      : ((user?.subscriptionPlan as "free" | "pro" | "team") || "free")
     
     // Count existing event types (excluding blocked time)
     const existingEventTypesCount = await prisma.eventType.count({

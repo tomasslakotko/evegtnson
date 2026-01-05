@@ -283,9 +283,9 @@ export async function DELETE(
           }
         })
 
-        const planId = (hostUser?.organizationId && hostUser.organization?.subscriptionPlan) 
-          ? hostUser.organization.subscriptionPlan 
-          : (hostUser?.subscriptionPlan || "free")
+        const planId: "free" | "pro" | "team" = (hostUser?.organizationId && hostUser.organization?.subscriptionPlan) 
+          ? (hostUser.organization.subscriptionPlan as "free" | "pro" | "team")
+          : ((hostUser?.subscriptionPlan as "free" | "pro" | "team") || "free")
 
         if (checkFeatureAccess(planId, "calendarIntegrations")) {
           await deleteGoogleCalendarEvent(booking.hostId, booking.googleCalendarEventId)
