@@ -58,7 +58,7 @@ export function CreateEventTypeForm({ currentUserId, urlPrefix = "username", ini
   const [members, setMembers] = useState<Member[]>([])
 
   const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any, // Temporary fix for complex Zod types inference
     defaultValues: {
       title: initialData?.title || "",
       slug: initialData?.slug || "",
