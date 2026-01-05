@@ -1,0 +1,199 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  accounts      Account[]
+  sessions      Session[]
+  
+  // App specific
+  username      String?   @unique
+  bio           String?
+  eventTypes    EventType[]
+  bookings      Booking[] @relation("HostBookings")
+  schedule      Schedule[]
+  
+  // Organization/Team
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  role           String?   @default("member") // system_admin, owner, admin, member
+  tags           UserTag[]
+  
+  // Hosts
+  hostedEventTypes EventTypeHost[]
+
+  // Stripe
+  stripeCustomerId       String?
+  stripeSubscriptionId   String?
+  stripePriceId          String?
+  stripeCurrentPeriodEnd DateTime?
+  
+  // Subscription Plan (free, pro, team) - can be set manually or via Stripe
+  subscriptionPlan       String?  @default("free")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  
+  members     User[]
+  tags        Tag[]
+  
+  // Stripe
+  stripeCustomerId       String?
+  stripeSubscriptionId   String?
+  stripePriceId          String?
+  stripeCurrentPeriodEnd DateTime?
+  
+  // Subscription Plan (free, pro, team) - can be set manually or via Stripe
+  subscriptionPlan       String?  @default("free")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model EventType {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String
+  description String?
+  duration    Int       // in minutes
+  url         String?   // custom booking url part
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+  hosts       EventTypeHost[]
+  
+  // Call location
+  locationType String   @default("google_meet") // google_meet, teams, phone
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, slug])
+}
+
+model EventTypeHost {
+  eventTypeId String
+  eventType   EventType @relation(fields: [eventTypeId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([eventTypeId, userId])
+}
+
+model Booking {
+  id          String   @id @default(cuid())
+  startTime   DateTime
+  endTime     DateTime
+  status      String   @default("confirmed") // confirmed, cancelled, rejected
+  
+  eventTypeId String
+  eventType   EventType @relation(fields: [eventTypeId], references: [id])
+  
+  hostId      String
+  host        User      @relation("HostBookings", fields: [hostId], references: [id])
+  
+  attendeeName  String
+  attendeeEmail String
+  attendeePhone String?
+  attendeeNotes String?
+  
+  meetingUrl    String?
+  googleCalendarEventId String? // ID события в Google Calendar
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Schedule {
+  id        String   @id @default(cuid())
+  userId    String
+  day       Int      // 0-6 (Sun-Sat)
+  startTime String   // "09:00"
+  endTime   String   // "17:00"
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String
+  color     String?   // hex color code
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users     UserTag[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, name])
+}
+
+model UserTag {
+  id     String @id @default(cuid())
+  userId String
+  tagId  String
+  
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@unique([userId, tagId])
+}
