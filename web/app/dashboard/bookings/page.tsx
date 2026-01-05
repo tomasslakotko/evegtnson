@@ -29,26 +29,30 @@ export default async function BookingsPage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">Bookings</h1>
       <div className="space-y-4">
-        {bookings.map((booking) => (
+        {bookings.map((booking) => {
+          if (!booking.eventType) {
+            return null
+          }
+          return (
           <Card key={booking.id}>
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium">
-                {booking.eventType.title} with {booking.attendeeName}
+                {booking.eventType?.title || "Untitled Event"} with {booking.attendeeName || "Guest"}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-2 text-sm text-muted-foreground">
                 <div className="flex items-center">
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(booking.startTime, "EEEE, MMMM d, yyyy")}
+                  {format(new Date(booking.startTime), "EEEE, MMMM d, yyyy")}
                 </div>
                 <div className="flex items-center">
                   <Clock className="mr-2 h-4 w-4" />
-                  {format(booking.startTime, "h:mm a")} - {format(booking.endTime, "h:mm a")}
+                  {format(new Date(booking.startTime), "h:mm a")} - {format(new Date(booking.endTime), "h:mm a")}
                 </div>
                 <div className="flex items-center">
                   <Video className="mr-2 h-4 w-4" />
-                  {booking.eventType.locationType}
+                  {booking.eventType?.locationType || "Online"}
                 </div>
                 {booking.attendeePhone && (
                   <div className="flex items-center">
@@ -87,7 +91,8 @@ export default async function BookingsPage() {
               <BookingActions booking={booking} />
             </CardContent>
           </Card>
-        ))}
+          )
+        })}
         {bookings.length === 0 && (
             <div className="text-center py-10 text-muted-foreground">No bookings yet.</div>
         )}
