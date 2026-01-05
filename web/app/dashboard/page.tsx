@@ -31,16 +31,27 @@ export default async function DashboardPage() {
 
   // If owner/admin, fetch all event types for the organization
   if ((user?.role === "owner" || user?.role === "admin") && user.organizationId) {
-    const orgMembers = await prisma.user.findMany({
-      where: { organizationId: user.organizationId },
-      select: { id: true }
-    })
-    const memberIds = orgMembers.map(m => m.id)
-    whereClause = { userId: { in: memberIds } }
+    // Optimized: Use direct query instead of fetching all members first
+    whereClause = { 
+      user: {
+        organizationId: user.organizationId
+      }
+    }
   }
 
   const eventTypes = await prisma.eventType.findMany({
     where: whereClause,
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      duration: true,
+      locationType: true,
+      userId: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
   })
   
   // Filter out "Blocked Time" event types - these are internal and shouldn't be shown
