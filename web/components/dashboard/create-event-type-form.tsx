@@ -54,7 +54,7 @@ interface CreateEventTypeFormProps {
 export function CreateEventTypeForm({ currentUserId, urlPrefix = "username", initialData }: CreateEventTypeFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<React.ReactNode | null>(null)
   const [members, setMembers] = useState<Member[]>([])
 
   const form = useForm<z.infer<typeof formSchema>>({
