@@ -79,6 +79,8 @@ export function CalendarIntegrations() {
   const handleConnect = async () => {
     setIsConnecting(true)
     try {
+      // Use signIn with Google provider which includes calendar scopes
+      // This will update existing Google account with calendar permissions if already connected
       await signIn("google", {
         callbackUrl: "/dashboard/settings",
         redirect: true,
