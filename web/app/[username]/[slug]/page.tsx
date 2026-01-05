@@ -8,6 +8,8 @@ export default async function BookingPage(props: { params: Promise<{ username: s
   const params = await props.params;
   const { username, slug } = params
 
+  console.log(`[BookingPage] Requested: username=${username}, slug=${slug}`)
+
   // Try to find user by username first
   let user = await prisma.user.findUnique({
     where: { username },
@@ -15,6 +17,8 @@ export default async function BookingPage(props: { params: Promise<{ username: s
       organization: true
     }
   })
+  
+  console.log(`[BookingPage] User found by username? ${!!user}`)
 
   // If not found, try to find organization by slug
   if (!user) {
@@ -30,6 +34,8 @@ export default async function BookingPage(props: { params: Promise<{ username: s
       }
     })
 
+    console.log(`[BookingPage] Organization found by slug? ${!!organization}`)
+
     if (organization && organization.members.length > 0) {
       // Use the first owner/admin as the base user for event type lookup
       user = await prisma.user.findUnique({
@@ -38,10 +44,12 @@ export default async function BookingPage(props: { params: Promise<{ username: s
           organization: true
         }
       })
+      console.log(`[BookingPage] User set to org admin: ${user?.id}`)
     }
   }
 
   if (!user) {
+    console.log(`[BookingPage] No user or organization found -> 404`)
     notFound()
   }
 
@@ -62,12 +70,17 @@ export default async function BookingPage(props: { params: Promise<{ username: s
     }
   })
 
+  console.log(`[BookingPage] Event type found initially? ${!!eventType}`)
+
   // If not found and user has organization, search in all org members
   if (!eventType && user.organizationId) {
+    console.log(`[BookingPage] Searching in org members...`)
     const orgMembers = await prisma.user.findMany({
       where: { organizationId: user.organizationId },
       select: { id: true }
     })
+
+    console.log(`[BookingPage] Checking ${orgMembers.length} members`)
 
     for (const member of orgMembers) {
       eventType = await prisma.eventType.findUnique({
@@ -85,11 +98,15 @@ export default async function BookingPage(props: { params: Promise<{ username: s
           }
         }
       })
-      if (eventType) break
+      if (eventType) {
+          console.log(`[BookingPage] Found event type on member: ${member.id}`)
+          break
+      }
     }
   }
 
   if (!eventType) {
+    console.log(`[BookingPage] Event type not found anywhere -> 404`)
     notFound()
   }
 
