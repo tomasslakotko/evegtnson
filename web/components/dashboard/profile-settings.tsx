@@ -1,10 +1,24 @@
 "use client"
 
-import { useRef } from "react"
-import { Upload } from "lucide-react"
-import { upload } from '@vercel/blob/client';
+import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Loader2, Check, X, Mail, Upload } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
-// ... (interface remains the same)
+interface ProfileData {
+  id: string
+  name: string | null
+  email: string | null
+  username: string | null
+  bio: string | null
+  image: string | null
+}
 
 export function ProfileSettings() {
   const router = useRouter()
@@ -12,13 +26,38 @@ export function ProfileSettings() {
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [isUploading, setIsUploading] = useState(false) // New state
+  const [isUploading, setIsUploading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // ... (useEffect and initial fetch remain the same)
+  const [formData, setFormData] = useState({
+    name: "",
+    username: "",
+    bio: "",
+  })
 
-  // New function for handling file upload
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch("/api/profile")
+        if (res.ok) {
+          const data = await res.json()
+          setProfile(data)
+          setFormData({
+            name: data.name || "",
+            username: data.username || "",
+            bio: data.bio || "",
+          })
+        }
+      } catch (err) {
+        console.error("Error fetching profile:", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchProfile()
+  }, [])
+
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) {
       return;
@@ -29,37 +68,20 @@ export function ProfileSettings() {
     setError(null);
 
     try {
-      // 1. Upload to Vercel Blob
-      const response = await fetch(`/api/upload`, {
+      // Direct upload to our API endpoint
+      const response = await fetch(`/api/upload?filename=${file.name}`, {
         method: 'POST',
-        body: JSON.stringify({ filename: file.name, contentType: file.type }),
-      });
-      const newBlob = await response.json();
-      
-      // The API route handles database update in the onUploadCompleted callback 
-      // OR we can do it manually here if we want immediate feedback in UI without waiting for webhook
-      // Let's do a direct upload from client for simplicity and speed if we use client-side tokens
-      // But since we implemented server-side token generation, we need to use the client SDK with the token
-      
-      // ACTUALLY, let's use the simplest flow: Client uploads to our API, API uploads to Blob
-      // Wait, Vercel Blob recommends client uploads. Let's stick to the official client SDK pattern.
-      // But we need to install the client package.
-      
-      // Let's try a simpler approach first: Upload via our API endpoint directly
-      // Re-reading the API route I wrote: it uses handleUpload which expects the client to use the `upload` function from @vercel/blob/client
-      
-      // Let's use the `upload` function from the client SDK
-      const { url } = await put(file.name, file, {
-        access: 'public',
-        handleUploadUrl: '/api/upload',
+        body: file,
       });
 
-      // Update local state
-      setProfile(prev => prev ? ({ ...prev, image: url }) : null);
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const newBlob = await response.json();
       
-      // The database update is handled by the server-side callback in /api/upload
-      // But to be sure UI reflects it immediately and persists if callback is slow:
-      // (The callback updates the DB, so refresh should show it)
+      // Update local state
+      setProfile(prev => prev ? ({ ...prev, image: newBlob.url }) : null);
       
       router.refresh();
       setIsUploading(false);
@@ -70,13 +92,56 @@ export function ProfileSettings() {
     }
   };
 
-  // ... (handleSubmit remains the same)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSaving(true)
+    setError(null)
+    setSuccess(false)
 
-  // ... (isLoading check remains the same)
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.message || "Failed to update profile")
+        return
+      }
+
+      const updated = await res.json()
+      setProfile(updated)
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+      router.refresh()
+    } catch (err) {
+      console.error("Error updating profile:", err)
+      setError("An error occurred while updating profile")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card>
-      {/* ... Header ... */}
+      <CardHeader>
+        <CardTitle>Profile</CardTitle>
+        <CardDescription>Manage your public profile settings.</CardDescription>
+      </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Avatar Section */}
@@ -120,9 +185,8 @@ export function ProfileSettings() {
                         size="sm"
                         className="text-destructive hover:text-destructive"
                         onClick={async () => {
-                             // Handle delete logic if needed
+                             // Simple remove from UI and DB update
                              setProfile(prev => prev ? ({ ...prev, image: null }) : null);
-                             // Call API to remove image from DB
                              await fetch("/api/profile", {
                                 method: "PATCH",
                                 headers: { "Content-Type": "application/json" },
@@ -139,8 +203,6 @@ export function ProfileSettings() {
               </p>
             </div>
           </div>
-
-          {/* ... Rest of the form ... */}
 
           {/* Email (read-only) */}
           <div className="grid gap-2">
@@ -233,4 +295,3 @@ export function ProfileSettings() {
     </Card>
   )
 }
-
