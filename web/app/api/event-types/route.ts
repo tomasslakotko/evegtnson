@@ -24,16 +24,16 @@ export async function GET(req: Request) {
     select: { role: true, organizationId: true }
   })
 
+  // Optimized: Use direct query instead of fetching all members first
   let whereClause: any = { userId: session.user.id }
 
   // If owner/admin, fetch all event types for the organization to allow assigning/booking for others
   if ((user?.role === "owner" || user?.role === "admin") && user.organizationId) {
-    const orgMembers = await prisma.user.findMany({
-      where: { organizationId: user.organizationId },
-      select: { id: true }
-    })
-    const memberIds = orgMembers.map(m => m.id)
-    whereClause = { userId: { in: memberIds } }
+    whereClause = { 
+      user: {
+        organizationId: user.organizationId
+      }
+    }
   }
 
   const eventTypes = await prisma.eventType.findMany({
@@ -67,7 +67,12 @@ export async function GET(req: Request) {
       hosts: et.hosts.map(h => h.user)
     }))
 
-  return NextResponse.json(transformedEventTypes)
+  // Cache headers for better performance
+  return NextResponse.json(transformedEventTypes, {
+    headers: {
+      'Cache-Control': 'private, max-age=60, stale-while-revalidate=120',
+    },
+  })
 }
 
 export async function POST(req: Request) {
