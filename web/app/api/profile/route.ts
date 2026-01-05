@@ -38,8 +38,15 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
-        ...user,
-        providers: user.accounts?.map(acc => acc.provider) || []
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        bio: user.bio,
+        image: user.image,
+        providers: (user.accounts && Array.isArray(user.accounts)) 
+          ? user.accounts.map(acc => acc.provider) 
+          : []
     })
   } catch (error: any) {
     console.error("Error fetching profile:", error)
@@ -78,8 +85,15 @@ export async function PATCH(req: Request) {
             }
         })
         return NextResponse.json({
-            ...updatedUser,
-            providers: updatedUser.accounts.map(acc => acc.provider)
+            id: updatedUser.id,
+            name: updatedUser.name,
+            email: updatedUser.email,
+            username: updatedUser.username,
+            bio: updatedUser.bio,
+            image: updatedUser.image,
+            providers: (updatedUser.accounts && Array.isArray(updatedUser.accounts))
+              ? updatedUser.accounts.map(acc => acc.provider)
+              : []
         })
     }
 
@@ -118,8 +132,15 @@ export async function PATCH(req: Request) {
     })
 
     return NextResponse.json({
-        ...updatedUser,
-        providers: updatedUser.accounts.map(acc => acc.provider)
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        username: updatedUser.username,
+        bio: updatedUser.bio,
+        image: updatedUser.image,
+        providers: (updatedUser.accounts && Array.isArray(updatedUser.accounts))
+          ? updatedUser.accounts.map(acc => acc.provider)
+          : []
     })
   } catch (error: any) {
     console.error("Error updating profile:", error)
