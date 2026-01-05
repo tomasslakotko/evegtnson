@@ -39,11 +39,14 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
         ...user,
-        providers: user.accounts.map(acc => acc.provider)
+        providers: user.accounts?.map(acc => acc.provider) || []
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching profile:", error)
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ 
+      message: "Internal server error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
+    }, { status: 500 })
   }
 }
 

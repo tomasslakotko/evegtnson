@@ -31,10 +31,11 @@ export function CalendarIntegrations() {
   const fetchConnectionStatus = async () => {
     try {
       const res = await fetch("/api/calendar/google")
+      let hasCalendarAccess = false
+      
       if (res.ok) {
         const data = await res.json()
         // Check if Google account has calendar access by trying to get calendar client
-        let hasCalendarAccess = false
         if (data.connected) {
           try {
             const calendarRes = await fetch("/api/calendar/google/check-access")
@@ -47,30 +48,52 @@ export function CalendarIntegrations() {
             hasCalendarAccess = false
           }
         }
-        
-        setIntegrations([
-          {
-            id: "google",
-            name: "Google Calendar",
-            icon: <div className="bg-red-100 p-2 rounded-full w-10 h-10 flex items-center justify-center font-bold text-red-600">G</div>,
-            description: "Connect your Google Calendar to check for conflicts and sync events",
-            connected: hasCalendarAccess,
-            action: hasCalendarAccess ? handleDisconnect : handleConnect,
-          },
-          {
-            id: "outlook",
-            name: "Outlook Calendar",
-            icon: <div className="bg-blue-100 p-2 rounded-full w-10 h-10 flex items-center justify-center font-bold text-blue-600">O</div>,
-            description: "Connect your Outlook Calendar to check for conflicts",
-            connected: false,
-            action: () => {
-              alert("Outlook Calendar integration coming soon!")
-            }
-          },
-        ])
       }
+      
+      // Set integrations even if API call failed - show default state
+      setIntegrations([
+        {
+          id: "google",
+          name: "Google Calendar",
+          icon: <div className="bg-red-100 p-2 rounded-full w-10 h-10 flex items-center justify-center font-bold text-red-600">G</div>,
+          description: "Connect your Google Calendar to check for conflicts and sync events",
+          connected: hasCalendarAccess,
+          action: hasCalendarAccess ? handleDisconnect : handleConnect,
+        },
+        {
+          id: "outlook",
+          name: "Outlook Calendar",
+          icon: <div className="bg-blue-100 p-2 rounded-full w-10 h-10 flex items-center justify-center font-bold text-blue-600">O</div>,
+          description: "Connect your Outlook Calendar to check for conflicts",
+          connected: false,
+          action: () => {
+            alert("Outlook Calendar integration coming soon!")
+          }
+        },
+      ])
     } catch (error) {
       console.error("Error fetching connection status:", error)
+      // Set default integrations on error
+      setIntegrations([
+        {
+          id: "google",
+          name: "Google Calendar",
+          icon: <div className="bg-red-100 p-2 rounded-full w-10 h-10 flex items-center justify-center font-bold text-red-600">G</div>,
+          description: "Connect your Google Calendar to check for conflicts and sync events",
+          connected: false,
+          action: handleConnect,
+        },
+        {
+          id: "outlook",
+          name: "Outlook Calendar",
+          icon: <div className="bg-blue-100 p-2 rounded-full w-10 h-10 flex items-center justify-center font-bold text-blue-600">O</div>,
+          description: "Connect your Outlook Calendar to check for conflicts",
+          connected: false,
+          action: () => {
+            alert("Outlook Calendar integration coming soon!")
+          }
+        },
+      ])
     } finally {
       setIsLoading(false)
     }
