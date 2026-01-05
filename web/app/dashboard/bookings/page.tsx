@@ -7,54 +7,74 @@ import Link from "next/link"
 import { BookingActions } from "@/components/dashboard/booking-actions"
 
 export default async function BookingsPage() {
-  const session = await auth()
-  if (!session?.user?.id) return null
-
-  const bookings = await prisma.booking.findMany({
-    where: { hostId: session.user.id },
-    orderBy: { startTime: 'desc' },
-    include: { 
-      eventType: true,
-      host: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        }
-      }
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return (
+        <div className="space-y-6">
+          <h1 className="text-3xl font-bold tracking-tight">Bookings</h1>
+          <div className="text-center py-10 text-muted-foreground">Please sign in to view your bookings.</div>
+        </div>
+      )
     }
-  })
 
-  // Serialize all data to plain objects before rendering
-  const serializedBookings = bookings
-    .filter(booking => booking.eventType && booking.startTime && booking.endTime)
-    .map(booking => {
-      const startTime = new Date(booking.startTime)
-      const endTime = new Date(booking.endTime)
-      
-      // Skip invalid dates
-      if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-        return null
-      }
-      
-      return {
-        id: booking.id,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-        status: booking.status,
-        attendeeName: booking.attendeeName || "",
-        attendeeEmail: booking.attendeeEmail || "",
-        attendeePhone: booking.attendeePhone || null,
-        attendeeNotes: booking.attendeeNotes || null,
-        meetingUrl: booking.meetingUrl || null,
+    const bookings = await prisma.booking.findMany({
+      where: { hostId: session.user.id },
+      orderBy: { startTime: 'desc' },
+      include: { 
         eventType: {
-          title: booking.eventType?.title || "Untitled Event",
-          locationType: booking.eventType?.locationType || "Online",
-          duration: booking.eventType?.duration || 60
+          select: {
+            id: true,
+            title: true,
+            locationType: true,
+            duration: true
+          }
+        },
+        host: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
         }
       }
     })
-    .filter((booking): booking is NonNullable<typeof booking> => booking !== null)
+
+    // Serialize all data to plain objects before rendering
+    const serializedBookings = bookings
+      .filter(booking => booking.eventType && booking.startTime && booking.endTime)
+      .map(booking => {
+        try {
+          const startTime = new Date(booking.startTime)
+          const endTime = new Date(booking.endTime)
+          
+          // Skip invalid dates
+          if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+            return null
+          }
+          
+          return {
+            id: booking.id,
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            status: booking.status || "confirmed",
+            attendeeName: booking.attendeeName || "",
+            attendeeEmail: booking.attendeeEmail || "",
+            attendeePhone: booking.attendeePhone || null,
+            attendeeNotes: booking.attendeeNotes || null,
+            meetingUrl: booking.meetingUrl || null,
+            eventType: {
+              title: booking.eventType?.title || "Untitled Event",
+              locationType: booking.eventType?.locationType || "Online",
+              duration: booking.eventType?.duration || 60
+            }
+          }
+        } catch (error) {
+          console.error("Error serializing booking:", error)
+          return null
+        }
+      })
+      .filter((booking): booking is NonNullable<typeof booking> => booking !== null)
 
   return (
     <div className="space-y-6">
@@ -142,6 +162,17 @@ export default async function BookingsPage() {
         )}
       </div>
     </div>
-  )
+    )
+  } catch (error) {
+    console.error("Error loading bookings page:", error)
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold tracking-tight">Bookings</h1>
+        <div className="text-center py-10 text-muted-foreground">
+          An error occurred while loading bookings. Please try again later.
+        </div>
+      </div>
+    )
+  }
 }
 
