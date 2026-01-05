@@ -86,7 +86,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   } catch (error: any) {
     console.error("Error updating event type:", error)
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ message: "Invalid request data", errors: error.errors }, { status: 400 })
+      return NextResponse.json({ message: "Invalid request data", errors: error.issues }, { status: 400 })
     }
     return NextResponse.json({ message: error.message || "Internal server error" }, { status: 500 })
   }

@@ -32,7 +32,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { 
           message: "Invalid input data", 
-          errors: parsed.error.errors.map((err) => ({
+          errors: parsed.error.issues.map((err) => ({
             path: err.path.join("."),
             message: err.message,
           }))
@@ -253,7 +253,7 @@ export async function POST(req: Request) {
     
     // Handle Zod validation errors
     if (error?.name === "ZodError" || error?.issues) {
-      const issues = error.issues || error.errors || [];
+      const issues = error.issues || [];
       return NextResponse.json(
         { 
           message: "Invalid input data", 
