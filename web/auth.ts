@@ -28,12 +28,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           
           if (!user.password) return null;
 
-          const passwordsMatch = await bcrypt.compare(password, user.password);
-          if (passwordsMatch) return user;
-        }
-        return null;
-      },
-    }),
+              const passwordsMatch = await bcrypt.compare(password, user.password);
+              if (passwordsMatch) {
+                return {
+                  ...user,
+                  username: user.username || undefined // Convert null to undefined
+                };
+              }
+            }
+            return null;
+          },
+        }),
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
