@@ -253,73 +253,88 @@ export async function POST(req: Request) {
 
       // Get user plan for checks
       const hostUser = await prisma.user.findUnique({
-            where: { id: hostId },
+        where: { id: hostId },
+        select: {
+          subscriptionPlan: true,
+          organizationId: true,
+          organization: {
             select: {
-              subscriptionPlan: true,
-              organizationId: true,
-              organization: {
-                select: {
-                  subscriptionPlan: true
-                }
-              }
+              subscriptionPlan: true
             }
-          })
-
-          const planId = (hostUser?.organizationId && hostUser.organization?.subscriptionPlan) 
-            ? hostUser.organization.subscriptionPlan 
-            : (hostUser?.subscriptionPlan || "free")
-
-          // Count bookings for current month (excluding cancelled and blocked time)
-          const now = new Date()
-          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-          const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
-
-          const monthlyBookingsCount = await prisma.booking.count({
-            where: {
-              hostId: hostId,
-              status: { not: "cancelled" },
-              attendeeEmail: { not: "blocked@internal.com" }, // Exclude blocked time
-              startTime: {
-                gte: startOfMonth,
-                lte: endOfMonth
-              }
-            }
-          })
-
-          // Check if user can create more bookings this month
-          if (!checkLimit(planId, "bookingsPerMonth", monthlyBookingsCount)) {
-            const plan = getPlanById(planId)
-            const limit = plan.limits.bookingsPerMonth
-            return new NextResponse(
-              `You've reached the monthly limit of ${limit} booking${limit === 1 ? '' : 's'} for your current plan (${plan.name}). Please upgrade to create more bookings.`,
-              { status: 403 }
-            )
           }
         }
+      })
 
-          // Get or create a default event type for this host
-          const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50) || 'manual-booking'
-          
-          let eventType = await prisma.eventType.findFirst({
-            where: {
-              userId: hostId,
-              slug: slug
-            }
-          })
+      const planId = (hostUser?.organizationId && hostUser.organization?.subscriptionPlan) 
+        ? hostUser.organization.subscriptionPlan 
+        : (hostUser?.subscriptionPlan || "free")
 
-          if (!eventType) {
-            const duration = Math.round((end.getTime() - start.getTime()) / 60000)
-            
-            eventType = await prisma.eventType.create({
-              data: {
-                title: title,
-                slug: `${slug}-${Date.now()}`,
-                duration: duration > 0 ? duration : 60,
-                locationType: "google_meet",
-                userId: hostId,
-              }
-            })
+      // Check Google Calendar busy slots if user has calendar integration (skip for blocked time)
+      if (status !== "blocked" && attendeeEmail !== "blocked@internal.com" && checkFeatureAccess(planId, "calendarIntegrations")) {
+        try {
+          const isBusy = await checkGoogleCalendarBusy(hostId, start, end)
+          if (isBusy) {
+            return new NextResponse("Selected time slot conflicts with Google Calendar events", { status: 409 })
           }
+        } catch (error) {
+          // If calendar check fails, log but don't block booking
+          console.error("Error checking Google Calendar:", error)
+        }
+      }
+
+      // Check subscription plan booking limit for manual bookings (skip for blocked time)
+      if (status !== "blocked" && attendeeEmail !== "blocked@internal.com") {
+        // Count bookings for current month (excluding cancelled and blocked time)
+        const now = new Date()
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+
+        const monthlyBookingsCount = await prisma.booking.count({
+          where: {
+            hostId: hostId,
+            status: { not: "cancelled" },
+            attendeeEmail: { not: "blocked@internal.com" }, // Exclude blocked time
+            startTime: {
+              gte: startOfMonth,
+              lte: endOfMonth
+            }
+          }
+        })
+
+        // Check if user can create more bookings this month
+        if (!checkLimit(planId, "bookingsPerMonth", monthlyBookingsCount)) {
+          const plan = getPlanById(planId)
+          const limit = plan.limits.bookingsPerMonth
+          return new NextResponse(
+            `You've reached the monthly limit of ${limit} booking${limit === 1 ? '' : 's'} for your current plan (${plan.name}). Please upgrade to create more bookings.`,
+            { status: 403 }
+          )
+        }
+      }
+
+      // Get or create a default event type for this host
+      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50) || 'manual-booking'
+      
+      let eventType = await prisma.eventType.findFirst({
+        where: {
+          userId: hostId,
+          slug: slug
+        }
+      })
+
+      if (!eventType) {
+        const duration = Math.round((end.getTime() - start.getTime()) / 60000)
+        
+        eventType = await prisma.eventType.create({
+          data: {
+            title: title,
+            slug: `${slug}-${Date.now()}`,
+            duration: duration > 0 ? duration : 60,
+            locationType: "google_meet",
+            userId: hostId,
+          }
+        })
+      }
 
       // Generate meeting URL based on location type
       let meetingUrl = null;
@@ -329,58 +344,58 @@ export async function POST(req: Request) {
         meetingUrl = `${baseUrl}/join/${roomId}`;
       }
 
-          // Create booking
-          const booking = await prisma.booking.create({
-            data: {
-              eventTypeId: eventType.id,
-              hostId: hostId,
-              startTime: start,
-              endTime: end,
-              attendeeName,
-              attendeeEmail,
-              attendeePhone: attendeePhone || null,
-              attendeeNotes,
-              status: status || "confirmed",
-              meetingUrl: meetingUrl,
-            },
-            include: {
-              eventType: true,
-              host: {
-                select: {
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          })
-
-          // Create event in Google Calendar if integration is enabled (skip for blocked time)
-          if (status !== "blocked" && attendeeEmail !== "blocked@internal.com" && checkFeatureAccess(planId, "calendarIntegrations")) {
-            try {
-              const googleEventId = await createGoogleCalendarEvent(hostId, {
-                title: title,
-                description: attendeeNotes || undefined,
-                startTime: start,
-                endTime: end,
-                location: meetingUrl || eventType.locationType,
-                attendeeEmail: attendeeEmail,
-                attendeeName: attendeeName,
-              })
-
-              if (googleEventId) {
-                // Update booking with Google Calendar event ID
-                await prisma.booking.update({
-                  where: { id: booking.id },
-                  data: { googleCalendarEventId: googleEventId },
-                })
-              }
-            } catch (error) {
-              // Log error but don't fail the booking
-              console.error("Error creating Google Calendar event:", error)
+      // Create booking
+      const booking = await prisma.booking.create({
+        data: {
+          eventTypeId: eventType.id,
+          hostId: hostId,
+          startTime: start,
+          endTime: end,
+          attendeeName,
+          attendeeEmail,
+          attendeePhone: attendeePhone || null,
+          attendeeNotes,
+          status: status || "confirmed",
+          meetingUrl: meetingUrl,
+        },
+        include: {
+          eventType: true,
+          host: {
+            select: {
+              name: true,
+              email: true
             }
           }
+        }
+      })
 
-          // Send confirmation email (skip for blocked time)
+      // Create event in Google Calendar if integration is enabled (skip for blocked time)
+      if (status !== "blocked" && attendeeEmail !== "blocked@internal.com" && checkFeatureAccess(planId, "calendarIntegrations")) {
+        try {
+          const googleEventId = await createGoogleCalendarEvent(hostId, {
+            title: title,
+            description: attendeeNotes || undefined,
+            startTime: start,
+            endTime: end,
+            location: meetingUrl || eventType.locationType,
+            attendeeEmail: attendeeEmail,
+            attendeeName: attendeeName,
+          })
+
+          if (googleEventId) {
+            // Update booking with Google Calendar event ID
+            await prisma.booking.update({
+              where: { id: booking.id },
+              data: { googleCalendarEventId: googleEventId },
+            })
+          }
+        } catch (error) {
+          // Log error but don't fail the booking
+          console.error("Error creating Google Calendar event:", error)
+        }
+      }
+
+      // Send confirmation email (skip for blocked time)
       if (status !== "blocked" && attendeeEmail !== "blocked@internal.com") {
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL 
           ? `https://${process.env.VERCEL_URL}` 
