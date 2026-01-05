@@ -25,28 +25,50 @@ export default async function BookingsPage() {
     }
   })
 
+  // Serialize all data to plain objects before rendering
+  const serializedBookings = bookings
+    .filter(booking => booking.eventType && booking.startTime && booking.endTime)
+    .map(booking => {
+      const startTime = new Date(booking.startTime)
+      const endTime = new Date(booking.endTime)
+      
+      // Skip invalid dates
+      if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+        return null
+      }
+      
+      return {
+        id: booking.id,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        status: booking.status,
+        attendeeName: booking.attendeeName || "",
+        attendeeEmail: booking.attendeeEmail || "",
+        attendeePhone: booking.attendeePhone || null,
+        attendeeNotes: booking.attendeeNotes || null,
+        meetingUrl: booking.meetingUrl || null,
+        eventType: {
+          title: booking.eventType?.title || "Untitled Event",
+          locationType: booking.eventType?.locationType || "Online",
+          duration: booking.eventType?.duration || 60
+        }
+      }
+    })
+    .filter((booking): booking is NonNullable<typeof booking> => booking !== null)
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">Bookings</h1>
       <div className="space-y-4">
-        {bookings.map((booking) => {
-          if (!booking.eventType || !booking.startTime || !booking.endTime) {
-            return null
-          }
+        {serializedBookings.map((booking) => {
+          const startTime = new Date(booking.startTime)
+          const endTime = new Date(booking.endTime)
           
-          try {
-            const startTime = new Date(booking.startTime)
-            const endTime = new Date(booking.endTime)
-            
-            if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-              return null
-            }
-            
-            return (
+          return (
             <Card key={booking.id}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-medium">
-                  {booking.eventType?.title || "Untitled Event"} with {booking.attendeeName || "Guest"}
+                  {booking.eventType.title} with {booking.attendeeName || "Guest"}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -61,7 +83,7 @@ export default async function BookingsPage() {
                   </div>
                   <div className="flex items-center">
                     <Video className="mr-2 h-4 w-4" />
-                    {booking.eventType?.locationType || "Online"}
+                    {booking.eventType.locationType}
                   </div>
                   {booking.attendeePhone && (
                     <div className="flex items-center">
@@ -99,8 +121,8 @@ export default async function BookingsPage() {
                 </div>
                 <BookingActions booking={{
                   id: booking.id,
-                  startTime: startTime.toISOString(),
-                  endTime: endTime.toISOString(),
+                  startTime: booking.startTime,
+                  endTime: booking.endTime,
                   status: booking.status,
                   attendeeName: booking.attendeeName,
                   attendeeEmail: booking.attendeeEmail,
@@ -113,13 +135,9 @@ export default async function BookingsPage() {
                 }} />
               </CardContent>
             </Card>
-            )
-          } catch (error) {
-            console.error("Error rendering booking:", error)
-            return null
-          }
+          )
         })}
-        {bookings.length === 0 && (
+        {serializedBookings.length === 0 && (
             <div className="text-center py-10 text-muted-foreground">No bookings yet.</div>
         )}
       </div>
