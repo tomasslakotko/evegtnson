@@ -72,36 +72,29 @@ export default async function BookingPage(props: { params: Promise<{ username: s
 
   console.log(`[BookingPage] Event type found initially? ${!!eventType}`)
 
-  // If not found and user has organization, search in all org members
+  // If not found and user has organization, search efficiently across all organization members
   if (!eventType && user.organizationId) {
-    console.log(`[BookingPage] Searching in org members...`)
-    const orgMembers = await prisma.user.findMany({
-      where: { organizationId: user.organizationId },
-      select: { id: true }
-    })
-
-    console.log(`[BookingPage] Checking ${orgMembers.length} members`)
-
-    for (const member of orgMembers) {
-      eventType = await prisma.eventType.findUnique({
-        where: {
-          userId_slug: {
-            userId: member.id,
-            slug,
-          }
-        },
-        include: {
-          hosts: {
-            include: {
-              user: true
-            }
+    console.log(`[BookingPage] Searching via optimized query in org...`)
+    
+    // Optimized query: Find ANY event type with this slug belonging to ANY member of the organization
+    eventType = await prisma.eventType.findFirst({
+      where: {
+        slug: slug,
+        user: {
+          organizationId: user.organizationId
+        }
+      },
+      include: {
+        hosts: {
+          include: {
+            user: true
           }
         }
-      })
-      if (eventType) {
-          console.log(`[BookingPage] Found event type on member: ${member.id}`)
-          break
       }
+    })
+    
+    if (eventType) {
+      console.log(`[BookingPage] Found event type via optimized query: ${eventType.id}`)
     }
   }
 
