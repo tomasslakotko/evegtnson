@@ -25,6 +25,11 @@ export async function GET(req: Request) {
         username: true,
         bio: true,
         image: true,
+        accounts: {
+          select: {
+            provider: true
+          }
+        }
       }
     })
 
@@ -32,7 +37,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: "User not found" }, { status: 404 })
     }
 
-    return NextResponse.json(user)
+    return NextResponse.json({
+        ...user,
+        providers: user.accounts.map(acc => acc.provider)
+    })
   } catch (error) {
     console.error("Error fetching profile:", error)
     return NextResponse.json({ message: "Internal server error" }, { status: 500 })
@@ -47,6 +55,31 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json()
+    
+    // Handle special case for image update which might not be covered by schema (if sent separately)
+    // Or if username validation is complex
+    
+    // If only image is provided, skip schema validation for other fields
+    if (Object.keys(body).length === 1 && body.image !== undefined) {
+         const updatedUser = await prisma.user.update({
+            where: { id: session.user.id },
+            data: { image: body.image },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                username: true,
+                bio: true,
+                image: true,
+                accounts: { select: { provider: true } }
+            }
+        })
+        return NextResponse.json({
+            ...updatedUser,
+            providers: updatedUser.accounts.map(acc => acc.provider)
+        })
+    }
+
     const data = updateProfileSchema.parse(body)
 
     // Check if username is already taken (if provided and different from current)
@@ -77,16 +110,20 @@ export async function PATCH(req: Request) {
         username: true,
         bio: true,
         image: true,
+        accounts: { select: { provider: true } }
       }
     })
 
-    return NextResponse.json(updatedUser)
+    return NextResponse.json({
+        ...updatedUser,
+        providers: updatedUser.accounts.map(acc => acc.provider)
+    })
   } catch (error: any) {
     console.error("Error updating profile:", error)
     if (error instanceof z.ZodError) {
       return NextResponse.json({ 
         message: "Invalid request data", 
-        errors: error.issues 
+        issues: error.issues // Changed from error.errors to error.issues
       }, { status: 400 })
     }
     return NextResponse.json({ 
@@ -94,4 +131,3 @@ export async function PATCH(req: Request) {
     }, { status: 500 })
   }
 }
-
