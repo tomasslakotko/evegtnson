@@ -124,7 +124,7 @@ export default async function TeamPage() {
                     <>
                       <ManageMemberTags 
                         member={member} 
-                        availableTags={user.organization.tags || []}
+                        availableTags={user?.organization?.tags || []}
                       />
                       <ManageMemberAvailability
                         memberId={member.id}
